@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from core.plugins import get_menu_plugins
 from core.ui import Fore, Style, banner, clear
+from core.version import __version__
 
 
 def main_menu() -> str:
     """Render the main menu (auto-built from modules/ plugins) and return the user's choice."""
     clear()
     banner("GEEPS OSINT HUB")
-    print(f"{Fore.CYAN}A modular, public-source OSINT toolkit{Style.RESET_ALL}\n")
+    print(f"{Fore.CYAN}A modular, public-source OSINT toolkit{Style.RESET_ALL}  "
+          f"{Style.DIM}v{__version__}{Style.RESET_ALL}\n")
 
     plugins = get_menu_plugins()
 

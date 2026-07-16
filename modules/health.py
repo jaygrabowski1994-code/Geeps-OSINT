@@ -101,6 +101,8 @@ def _check_plugins() -> None:
 def run() -> None:
     clear()
     banner("HEALTH CHECK")
+    from core.version import __version__
+    print(f"Geeps OSINT Hub v{__version__}")
     print(f"Platform: {platform.system()} {platform.release()}  |  Python: {sys.version.split()[0]}\n")
 
     section("Python version")

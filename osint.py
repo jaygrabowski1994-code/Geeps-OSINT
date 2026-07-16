@@ -22,6 +22,7 @@ from core.logger import get_logger
 from core.plugins import get_broken_plugins, get_menu_plugins
 from core import report
 from core.ui import clear, confirm, err, info, pause
+from core.version import __version__
 
 log = get_logger("main")
 
@@ -73,6 +74,7 @@ def _dispatch(choice: str) -> bool:
 
 def _list_modules() -> int:
     """Print every discovered plugin (working and broken) and exit. Used by --list-modules."""
+    print(f"Geeps OSINT Hub v{__version__}\n")
     print("Installed modules:\n")
     for plugin in get_menu_plugins():
         print(f"  [{plugin.meta.key}] {plugin.meta.name} ({plugin.module_name}.py)")
@@ -89,6 +91,10 @@ def _list_modules() -> int:
 
 
 def main() -> int:
+    if "--version" in sys.argv or "-v" in sys.argv:
+        print(f"Geeps OSINT Hub v{__version__}")
+        return 0
+
     ensure_config_exists()
 
     if "--list-modules" in sys.argv:
