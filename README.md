@@ -10,14 +10,16 @@ self-audits, and public-record verification.
 
 | Menu | Module | What it does |
 |---|---|---|
-| 1 | Username Investigation | Checks a username across 55 major public platforms in parallel, with an optional handoff to [Sherlock](https://github.com/sherlock-project/sherlock) (400+ sites) if it's installed |
+| 1 | Username Investigation | Checks a username across 55 major public platforms in parallel, with optional handoff to [Sherlock](https://github.com/sherlock-project/sherlock) (400+ sites) and [Maigret](https://github.com/soxoj/maigret) (3000+ sites), with results parsed into clean, consistent output |
 | 2 | Email Investigation | Syntax validation, MX record lookup, disposable-domain check, public Gravatar lookup, optional HIBP breach check -- network checks run in parallel |
 | 3 | Phone Investigation | Offline validation, region, timezone, and carrier metadata via libphonenumber; optional numverify live verification; optional [PhoneInfoga](https://github.com/sundowndev/phoneinfoga) handoff if installed |
 | 4 | Domain Investigation | DNS records, WHOIS, HTTP reachability, and TLS certificate details -- all four run in parallel |
-| 8 | Subdomain Enumeration | Passive discovery via certificate transparency logs (crt.sh) plus a parallel DNS brute force against common subdomain names |
-| 5 | Employment Investigation | Generates public search links (name/employer) and verifies a claimed employer's public web presence -- never scrapes LinkedIn or any authenticated platform |
-| 7 | Tool Manager | Read-only inventory of which external OSINT tools (Sherlock, PhoneInfoga, Amass, etc.) are installed on this system |
-| 6 | Health Check | Verifies Python version, dependencies, config, logging, network connectivity, and which plugins loaded; can auto-install missing packages |
+| 5 | Subdomain Enumeration | Passive discovery via certificate transparency logs (crt.sh) plus a parallel DNS brute force against common subdomain names |
+| 6 | IP Investigation | Geolocation, network ownership (ISP/org/ASN), and reverse DNS for an IP address via public no-key sources; flags hosting/proxy/mobile networks |
+| 7 | Image Metadata (EXIF) | Extracts embedded metadata (camera, timestamps, and GPS coordinates) from a local image via exiftool, with a Pillow fallback; surfaces GPS as a map link |
+| 8 | Employment Investigation | Generates public search links (name/employer) and verifies a claimed employer's public web presence -- never scrapes LinkedIn or any authenticated platform |
+| 9 | Tool Manager | Read-only inventory of which external OSINT tools (Sherlock, PhoneInfoga, Maigret, Amass, etc.) are installed on this system |
+| 10 | Health Check | Verifies Python version, dependencies, config, logging, network connectivity, and which plugins loaded; can auto-install missing packages |
 
 Every module:
 - Has isolated error handling -- one failed lookup never crashes the app
@@ -47,14 +49,20 @@ contain the person/domain/number you investigated):
 Two menus offer to hand off to a well-known external tool if it's
 installed, instead of reimplementing it:
 
-- **Sherlock** (Username Investigation) -- checks 400+ sites, versus
-  this toolkit's own 55-site built-in list.
-  Install: `pipx install sherlock-project` (or `pip install sherlock-project`)
+- **Sherlock / Maigret** (Username Investigation) -- Sherlock checks
+  400+ sites, Maigret 3000+, versus this toolkit's own 55-site
+  built-in list. Both are offered if installed, and their results are
+  parsed into the same clean output format as the built-in checks.
+  Install: `pipx install sherlock-project` and/or `pip install maigret`
 - **PhoneInfoga** (Phone Investigation) -- runs additional scanners
   (VoIP/OVH detection, footprint search-link generation). Note: this
   upstream project describes itself as stable but unmaintained.
   Install: see [releases](https://github.com/sundowndev/phoneinfoga) for
   prebuilt binaries, or use their Docker image.
+- **exiftool** (Image Metadata) -- the preferred EXIF backend; if it's
+  not installed, the module falls back to Pillow for standard EXIF.
+  Install: Termux `pkg install exiftool`, Ubuntu
+  `sudo apt install libimage-exiftool-perl`.
 
 Both are entirely optional -- every module works fully without them,
 and the app only ever offers to run them, never auto-runs them.
@@ -171,12 +179,14 @@ Geeps-OSINT/
 │   ├── logger.py                # Rotating file + console logging
 │   ├── dependencies.py          # Startup dependency check / auto-install
 │   ├── netutils.py              # Shared HTTP helper (timeouts, retries)
+│   ├── dns_helper.py            # Resolver with public-DNS fallback (Termux/Android fix)
 │   ├── plugins.py               # Plugin discovery/registry -- see "Plugin system" below
 │   ├── report.py                # Report engine (HTML/JSON) -- see "Report generation" above
 │   ├── tools.py                 # External-tool detection (used by Tool Manager)
-│   ├── sherlock_runner.py       # Optional Sherlock subprocess launcher
+│   ├── sherlock_runner.py       # Optional Sherlock launcher + result parser
+│   ├── maigret_runner.py        # Optional Maigret launcher (shares Sherlock's parser)
 │   ├── phoneinfoga_runner.py    # Optional PhoneInfoga subprocess launcher
-│   └── ui.py                    # Shared terminal UI, parallel-run helper, report hooks
+│   └── ui.py                    # Shared terminal UI, width-aware wrapping, parallel-run helper, report hooks
 ├── modules/                     # Each file here = one auto-discovered menu entry
 │   ├── menu.py                  # (not a plugin -- builds the menu from the registry)
 │   ├── username.py
@@ -184,6 +194,8 @@ Geeps-OSINT/
 │   ├── phone.py
 │   ├── domain.py
 │   ├── subdomain.py
+│   ├── ip_lookup.py
+│   ├── exif_lookup.py
 │   ├── employment.py
 │   ├── tool_manager.py
 │   └── health.py

@@ -20,6 +20,8 @@ Two extra capabilities live here beyond plain print wrappers:
 from __future__ import annotations
 
 import os
+import shutil
+import textwrap
 import threading
 
 from core import report as _report
@@ -39,6 +41,112 @@ except ImportError:  # optional dependency
     Style = _NoColor()
 
 _local = threading.local()
+
+# Minimum width we'll ever wrap to -- narrower than this and wrapping does
+# more harm than good, so we just let the terminal do its own thing.
+_MIN_WRAP_WIDTH = 30
+# Cap: on a very wide desktop terminal, ultra-long lines are still hard to
+# read, but we don't want to force-wrap someone's roomy screen either.
+_MAX_WRAP_WIDTH = 100
+
+
+def _terminal_width() -> int:
+    """Best-effort current terminal width, with a sane fallback for pipes/Termux."""
+    try:
+        cols = shutil.get_terminal_size(fallback=(80, 24)).columns
+    except Exception:
+        cols = 80
+    return max(_MIN_WRAP_WIDTH, min(cols, _MAX_WRAP_WIDTH))
+
+
+def _wrap_message(msg: str, prefix_width: int) -> str:
+    """
+    Wrap a plain message to the terminal width, indenting continuation
+    lines by prefix_width so they line up under the first line's text
+    (past the "[+] " tag). Existing newlines in msg are preserved and
+    each resulting line wrapped independently.
+    """
+    width = _terminal_width()
+    body_width = max(_MIN_WRAP_WIDTH - prefix_width, width - prefix_width)
+    indent = " " * prefix_width
+
+    out_lines = []
+    for raw_line in msg.split("\n"):
+        if not raw_line:
+            out_lines.append("")
+            continue
+        wrapped = textwrap.wrap(
+            raw_line,
+            width=body_width,
+            break_long_words=True,   # a single 400-char token still has to break
+            break_on_hyphens=False,  # don't split domains/URLs on their hyphens
+        )
+        if not wrapped:
+            out_lines.append("")
+            continue
+        out_lines.append(wrapped[0])
+        out_lines.extend(indent + line for line in wrapped[1:])
+    return "\n".join(out_lines)
+
+
+def _emit(line_template: str, level: str, plain_msg: str, tag: str = "") -> None:
+    """
+    Send a formatted, width-wrapped line to this thread's capture buffer
+    or stdout. line_template contains a single {} where the (possibly
+    multi-line, indented) message goes; tag is the visible prefix like
+    "[+] " used to compute the continuation indent.
+    """
+    _report.record(level, plain_msg)
+    wrapped = _wrap_message(plain_msg, len(tag))
+    line = line_template.format(wrapped)
+    sink = getattr(_local, "sink", None)
+    if sink is not None:
+        sink.append(line)
+    else:
+        print(line)
+
+
+def clear() -> None:
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def banner(title: str) -> None:
+    width = 60
+    print(Fore.CYAN + "=" * width)
+    print(Fore.CYAN + title.center(width))
+    print(Fore.CYAN + "=" * width + Style.RESET_ALL)
+
+
+def section(title: str) -> None:
+    # Section headers are short; no wrapping needed, and we don't want the
+    # leading blank line to get an indent computed for it.
+    _report.record("section", title)
+    line = f"\n{Fore.YELLOW}-- {title} --{Style.RESET_ALL}"
+    sink = getattr(_local, "sink", None)
+    if sink is not None:
+        sink.append(line)
+    else:
+        print(line)
+
+
+def ok(msg: str) -> None:
+    _emit(f"{Fore.GREEN}[+]{Style.RESET_ALL} {{}}", "ok", msg, tag="[+] ")
+
+
+def warn(msg: str) -> None:
+    _emit(f"{Fore.YELLOW}[!]{Style.RESET_ALL} {{}}", "warn", msg, tag="[!] ")
+
+
+def err(msg: str) -> None:
+    _emit(f"{Fore.RED}[x]{Style.RESET_ALL} {{}}", "err", msg, tag="[x] ")
+
+
+def info(msg: str) -> None:
+    _emit(f"{Fore.CYAN}[*]{Style.RESET_ALL} {{}}", "info", msg, tag="[*] ")
+
+
+def pause() -> None:
+    input("\nPress Enter to return to the menu...")
 
 
 class capture:
@@ -68,51 +176,6 @@ class capture:
 
     def __exit__(self, *_exc) -> None:
         _local.sink = self._previous
-
-
-def _emit(line: str, level: str, plain_msg: str) -> None:
-    """Send a formatted line to this thread's capture buffer, or stdout."""
-    _report.record(level, plain_msg)
-    sink = getattr(_local, "sink", None)
-    if sink is not None:
-        sink.append(line)
-    else:
-        print(line)
-
-
-def clear() -> None:
-    os.system("cls" if os.name == "nt" else "clear")
-
-
-def banner(title: str) -> None:
-    width = 60
-    print(Fore.CYAN + "=" * width)
-    print(Fore.CYAN + title.center(width))
-    print(Fore.CYAN + "=" * width + Style.RESET_ALL)
-
-
-def section(title: str) -> None:
-    _emit(f"\n{Fore.YELLOW}-- {title} --{Style.RESET_ALL}", "section", title)
-
-
-def ok(msg: str) -> None:
-    _emit(f"{Fore.GREEN}[+]{Style.RESET_ALL} {msg}", "ok", msg)
-
-
-def warn(msg: str) -> None:
-    _emit(f"{Fore.YELLOW}[!]{Style.RESET_ALL} {msg}", "warn", msg)
-
-
-def err(msg: str) -> None:
-    _emit(f"{Fore.RED}[x]{Style.RESET_ALL} {msg}", "err", msg)
-
-
-def info(msg: str) -> None:
-    _emit(f"{Fore.CYAN}[*]{Style.RESET_ALL} {msg}", "info", msg)
-
-
-def pause() -> None:
-    input("\nPress Enter to return to the menu...")
 
 
 def prompt(msg: str, required: bool = True) -> str:

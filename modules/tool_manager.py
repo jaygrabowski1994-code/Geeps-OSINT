@@ -18,10 +18,10 @@ from core.plugins import PluginMeta
 from core.ui import banner, clear, info, ok, pause, section, warn
 
 MODULE_META = PluginMeta(
-    key="7",
+    key="9",
     name="Tool Manager",
     description="Detect installed external OSINT tools (Sherlock, PhoneInfoga, etc.)",
-    order=80,
+    order=90,
 )
 
 # (display name, core.tools key, note)
@@ -32,7 +32,7 @@ DISPLAY_TOOLS = [
     ("Sherlock", "sherlock", "used automatically by Username Investigation if installed"),
     ("PhoneInfoga", "phoneinfoga", "used automatically by Phone Investigation if installed"),
     ("Holehe", "holehe", "email-to-registered-accounts checker"),
-    ("Maigret", "maigret", "alternative username enumeration tool"),
+    ("Maigret", "maigret", "used automatically by Username Investigation if installed"),
     ("theHarvester", "theHarvester", "email/subdomain/name harvesting"),
     ("Amass", "amass", "subdomain enumeration"),
     ("Subfinder", "subfinder", "subdomain enumeration"),

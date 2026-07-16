@@ -22,10 +22,10 @@ from core.ui import banner, clear, err, info, ok, pause, section, warn
 log = get_logger("health")
 
 MODULE_META = PluginMeta(
-    key="6",
+    key="10",
     name="Health Check",
     description="Verify Python version, dependencies, config, logging, network, and installed plugins",
-    order=90,
+    order=100,
 )
 
 MIN_PYTHON = (3, 8)

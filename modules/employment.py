@@ -29,10 +29,10 @@ from modules import domain as domain_module
 log = get_logger("employment")
 
 MODULE_META = PluginMeta(
-    key="5",
+    key="8",
     name="Employment Investigation",
     description="Public search links plus employer domain sanity check (public info only)",
-    order=50,
+    order=80,
 )
 
 

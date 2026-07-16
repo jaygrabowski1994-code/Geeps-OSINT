@@ -39,6 +39,7 @@ REQUIRED_PACKAGES = [
     Dependency("phonenumbers", "phonenumbers", "phone number parsing/validation"),
     Dependency("bs4", "beautifulsoup4", "HTML parsing for public page checks"),
     Dependency("colorama", "colorama", "cross-platform colored terminal output", required=False),
+    Dependency("PIL", "Pillow", "EXIF fallback when exiftool isn't installed (image module)", required=False),
 ]
 
 

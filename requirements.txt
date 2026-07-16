@@ -4,3 +4,5 @@ python-whois>=0.9.4
 phonenumbers>=8.13.0
 beautifulsoup4>=4.12.0
 colorama>=0.4.6
+# Optional: only needed as an EXIF fallback if exiftool isn't installed
+Pillow>=10.0.0

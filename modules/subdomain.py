@@ -29,10 +29,10 @@ from modules.domain import normalize_domain
 log = get_logger("subdomain")
 
 MODULE_META = PluginMeta(
-    key="8",
+    key="5",
     name="Subdomain Enumeration",
     description="Discover subdomains via certificate transparency logs (crt.sh) and parallel DNS brute force",
-    order=45,
+    order=50,
 )
 
 # Common subdomain prefixes -- deliberately small and maintainable

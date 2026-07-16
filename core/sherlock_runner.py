@@ -16,13 +16,51 @@ so shell metacharacters in a username can't do anything unexpected.
 
 from __future__ import annotations
 
+import re
 import subprocess
+from dataclasses import dataclass
+from typing import List
 
 from core.tools import is_installed, path
 
 INSTALL_HINT = (
     "Install with: pipx install sherlock-project  (or: pip install sherlock-project)"
 )
+
+# Sherlock --print-found lines look like:  [+] Instagram: https://instagram.com/user
+# (with --no-color there are no escape codes to strip). Maigret's plain
+# output is similar: [+] Instagram: https://instagram.com/user
+_FOUND_RE = re.compile(r"^\s*\[\+\]\s*(?P<site>[^:]+):\s*(?P<url>https?://\S+)\s*$")
+
+
+@dataclass
+class FoundAccount:
+    site: str
+    url: str
+
+
+def parse_found(output: str) -> List[FoundAccount]:
+    """
+    Extract (site, url) pairs from Sherlock/Maigret '[+] Site: url' output.
+
+    Lines that don't match the found-account pattern (progress text,
+    banners, summaries) are ignored, so this is safe to run over raw
+    stdout. Deduplicated, preserving first-seen order.
+    """
+    seen = set()
+    results: List[FoundAccount] = []
+    for line in output.splitlines():
+        m = _FOUND_RE.match(line)
+        if not m:
+            continue
+        site = m.group("site").strip()
+        url = m.group("url").strip()
+        key = (site.lower(), url.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append(FoundAccount(site=site, url=url))
+    return results
 
 
 def available() -> bool:

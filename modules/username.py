@@ -22,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import List
 
-from core import sherlock_runner
+from core import maigret_runner, sherlock_runner
 from core.logger import get_logger
 from core.netutils import head, get
 from core.plugins import PluginMeta
@@ -33,7 +33,7 @@ log = get_logger("username")
 MODULE_META = PluginMeta(
     key="1",
     name="Username Investigation",
-    description="Check a username's presence across major public platforms, with optional Sherlock integration",
+    description="Check a username across major public platforms, with optional Sherlock/Maigret integration",
     order=10,
 )
 
@@ -158,19 +158,39 @@ def _check_platform(entry: dict, username: str) -> PlatformResult:
     return PlatformResult(entry["name"], url, "unknown", "unhandled mode")
 
 
-def _run_sherlock(username: str) -> None:
-    section("Sherlock (400+ sites)")
-    info("Running Sherlock -- this can take a minute or two...")
-    success, output = sherlock_runner.run(username)
+def _run_external_tool(tool_name: str, runner, username: str) -> None:
+    """
+    Run an external username tool (Sherlock/Maigret) and display its
+    findings parsed into the same clean '[+] Site: url' format as the
+    built-in checks, so results read consistently and land in the
+    report. Falls back to showing raw output only if parsing finds
+    nothing (so we never silently swallow a differently-formatted result).
+    """
+    section(f"{tool_name}")
+    info(f"Running {tool_name} -- this can take a minute or two...")
+    success, output = runner.run(username)
     if not success:
         warn(output)
         return
-    lines = [line for line in output.splitlines() if line.strip()]
-    if not lines:
-        info("Sherlock found no additional matches.")
+
+    accounts = runner.parse_found(output) if hasattr(runner, "parse_found") \
+        else sherlock_runner.parse_found(output)
+
+    if accounts:
+        for acct in accounts:
+            ok(f"{acct.site:24} {acct.url}")
+        info(f"{tool_name} found {len(accounts)} account(s).")
         return
-    for line in lines:
-        ok(line)
+
+    # Nothing parsed -- either genuinely no hits, or an unexpected format.
+    stripped = [ln for ln in output.splitlines() if ln.strip()]
+    if not stripped:
+        info(f"{tool_name} found no matches.")
+    else:
+        info(f"{tool_name} produced output that couldn't be parsed into accounts; "
+             "showing it raw:")
+        for line in stripped:
+            print(f"    {line}")
 
 
 def run() -> None:
@@ -220,11 +240,21 @@ def run() -> None:
     if sherlock_runner.available():
         if confirm("Sherlock is installed -- also run it for coverage across 400+ sites?", default=False):
             try:
-                _run_sherlock(username)
+                _run_external_tool("Sherlock (400+ sites)", sherlock_runner, username)
             except Exception:
                 log.exception("Unexpected error running Sherlock")
                 err("Unexpected error running Sherlock -- see logs for details.")
     else:
         info(f"Tip: install Sherlock for 400+ site coverage. {sherlock_runner.INSTALL_HINT}")
+
+    if maigret_runner.available():
+        if confirm("Maigret is installed -- also run it for coverage across 3000+ sites?", default=False):
+            try:
+                _run_external_tool("Maigret (3000+ sites)", maigret_runner, username)
+            except Exception:
+                log.exception("Unexpected error running Maigret")
+                err("Unexpected error running Maigret -- see logs for details.")
+    else:
+        info(f"Tip: install Maigret for 3000+ site coverage. {maigret_runner.INSTALL_HINT}")
 
     pause()
