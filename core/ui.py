@@ -111,17 +111,22 @@ def clear() -> None:
 
 
 def banner(title: str) -> None:
-    width = 60
-    print(Fore.CYAN + "=" * width)
-    print(Fore.CYAN + title.center(width))
-    print(Fore.CYAN + "=" * width + Style.RESET_ALL)
+    """A boxed title banner using Unicode box-drawing characters."""
+    width = min(_terminal_width(), 60)
+    inner = width - 2
+    print(Fore.CYAN + "\u256d" + "\u2500" * inner + "\u256e")
+    print(Fore.CYAN + "\u2502" + title.center(inner) + "\u2502")
+    print(Fore.CYAN + "\u2570" + "\u2500" * inner + "\u256f" + Style.RESET_ALL)
 
 
 def section(title: str) -> None:
     # Section headers are short; no wrapping needed, and we don't want the
     # leading blank line to get an indent computed for it.
     _report.record("section", title)
-    line = f"\n{Fore.YELLOW}-- {title} --{Style.RESET_ALL}"
+    underline = "\u2500" * (len(title) + 2)
+    line = "\n{y}\u25b8 {t}{r}\n{y}{u}{r}".format(
+        y=Fore.YELLOW, t=title, r=Style.RESET_ALL, u=underline
+    )
     sink = getattr(_local, "sink", None)
     if sink is not None:
         sink.append(line)

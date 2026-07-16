@@ -13,10 +13,18 @@ def main_menu() -> str:
     print(f"{Fore.CYAN}A modular, public-source OSINT toolkit{Style.RESET_ALL}\n")
 
     plugins = get_menu_plugins()
+
+    # Right-align the key inside brackets so [1] and [10] line up their names.
+    max_key_len = max((len(p.meta.key) for p in plugins), default=1)
+    max_key_len = max(max_key_len, 1)
+
     for plugin in plugins:
-        print(f"  [{plugin.meta.key}] {plugin.meta.name}")
-    print("  [0] Exit")
+        key = plugin.meta.key.rjust(max_key_len)
+        print(f"  {Fore.GREEN}[{key}]{Style.RESET_ALL}  {plugin.meta.name}")
+
+    exit_key = "0".rjust(max_key_len)
+    print(f"  {Fore.RED}[{exit_key}]{Style.RESET_ALL}  Exit")
 
     print()
-    choice = input("Select an option: ").strip()
+    choice = input(f"{Fore.CYAN}\u25b8{Style.RESET_ALL} Select an option: ").strip()
     return choice

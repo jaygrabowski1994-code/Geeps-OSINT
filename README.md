@@ -6,6 +6,9 @@ credential stuffing, no authenticated scraping, no bypassing platform
 protections. It's meant for legitimate research, digital-footprint
 self-audits, and public-record verification.
 
+**New here?** See [CHEATSHEET.md](CHEATSHEET.md) for a quick command
+reference (launch, update, per-module usage, and Termux troubleshooting).
+
 ## Features
 
 | Menu | Module | What it does |
