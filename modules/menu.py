@@ -1,16 +1,30 @@
-def main_menu():
-    print("=" * 55)
-    print("              GEEPS OSINT HUB v1.0")
-    print("=" * 55)
-    print()
-    print("1. Username Investigation")
-    print("2. Email Investigation")
-    print("3. Phone Investigation")
-    print("4. Domain Investigation")
-    print("5. Update Tools")
-    print("0. Exit")
-    print()
+"""Main interactive menu for Geeps OSINT Hub."""
 
-    return input("Select an option: ")
-0
+from __future__ import annotations
 
+from core.ui import clear, banner, Fore, Style
+
+MENU_OPTIONS = {
+    "1": "Username Investigation",
+    "2": "Email Investigation",
+    "3": "Phone Investigation",
+    "4": "Domain Investigation",
+    "5": "Employment Investigation",
+    "6": "Health Check",
+    "0": "Exit",
+}
+
+
+def main_menu() -> str:
+    """Render the main menu and return the user's raw choice string."""
+    clear()
+    banner("GEEPS OSINT HUB")
+    print(f"{Fore.CYAN}A modular, public-source OSINT toolkit{Style.RESET_ALL}\n")
+
+    for key in ("1", "2", "3", "4", "5", "6"):
+        print(f"  [{key}] {MENU_OPTIONS[key]}")
+    print(f"  [0] {MENU_OPTIONS['0']}")
+
+    print()
+    choice = input("Select an option: ").strip()
+    return choice

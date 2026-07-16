@@ -1,7 +1,18 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
-*.log
+*.egg-info/
+.venv/
 venv/
-results/
+env/
+
+# App-local state (never committed -- contains API keys / logs)
+config/config.json
 logs/
+
+# OS/editor cruft
+.DS_Store
+.vscode/
+.idea/
+*.swp

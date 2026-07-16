@@ -1,0 +1,17 @@
+{
+  "app": {
+    "name": "Geeps OSINT Hub",
+    "log_level": "INFO",
+    "request_timeout_seconds": 8,
+    "max_retries": 2
+  },
+  "api_keys": {
+    "hibp_api_key": "",
+    "hunter_io_api_key": "",
+    "numverify_api_key": ""
+  },
+  "network": {
+    "user_agent": "Geeps-OSINT-Hub/2.0 (+https://github.com/)",
+    "verify_tls": true
+  }
+}
