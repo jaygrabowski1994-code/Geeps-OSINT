@@ -22,9 +22,17 @@ import re
 from core.config import get as config_get
 from core.logger import get_logger
 from core.netutils import get
+from core.plugins import PluginMeta
 from core.ui import banner, clear, err, info, ok, pause, prompt, section, warn
 
 log = get_logger("email")
+
+MODULE_META = PluginMeta(
+    key="2",
+    name="Email Investigation",
+    description="Syntax, MX, disposable-domain, Gravatar, and optional HIBP breach check",
+    order=20,
+)
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 

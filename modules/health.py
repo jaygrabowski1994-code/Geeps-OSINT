@@ -16,9 +16,17 @@ import sys
 from core.config import CONFIG_PATH, LOG_DIR, ConfigError, load_config
 from core.dependencies import check_dependencies, dependency_report
 from core.logger import get_logger
+from core.plugins import PluginMeta
 from core.ui import banner, clear, err, info, ok, pause, section, warn
 
 log = get_logger("health")
+
+MODULE_META = PluginMeta(
+    key="6",
+    name="Health Check",
+    description="Verify Python version, dependencies, config, logging, network, and installed plugins",
+    order=90,
+)
 
 MIN_PYTHON = (3, 8)
 
@@ -71,6 +79,25 @@ def _check_network() -> None:
         warn("You may be behind a firewall/proxy blocking outbound HTTPS.")
 
 
+def _check_plugins() -> None:
+    from core.plugins import discover_plugins
+
+    plugins = discover_plugins()
+    working = [p for p in plugins if p.load_error is None]
+    broken = [p for p in plugins if p.load_error is not None]
+
+    for plugin in working:
+        ok(f"[{plugin.meta.key}] {plugin.meta.name}  ({plugin.module_name}.py)")
+
+    for plugin in broken:
+        err(f"{plugin.module_name}.py failed to load: {plugin.load_error}")
+
+    if broken:
+        warn(f"{len(broken)} plugin(s) will not appear in the menu until fixed.")
+    else:
+        ok(f"All {len(working)} plugins loaded cleanly.")
+
+
 def run() -> None:
     clear()
     banner("HEALTH CHECK")
@@ -100,6 +127,13 @@ def run() -> None:
 
     section("Network connectivity")
     _check_network()
+
+    section("Plugins")
+    try:
+        _check_plugins()
+    except Exception:
+        log.exception("Unexpected error during plugin discovery")
+        err("Unexpected error while discovering plugins.")
 
     log.info("Health check complete")
     pause()

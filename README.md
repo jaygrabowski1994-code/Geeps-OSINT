@@ -112,9 +112,10 @@ Geeps-OSINT/
 │   ├── logger.py          # Rotating file + console logging
 │   ├── dependencies.py    # Startup dependency check / auto-install
 │   ├── netutils.py        # Shared HTTP helper (timeouts, retries)
+│   ├── plugins.py         # Plugin discovery/registry -- see "Plugin system" below
 │   └── ui.py               # Shared terminal UI helpers
-├── modules/
-│   ├── menu.py
+├── modules/                # Each file here = one auto-discovered menu entry
+│   ├── menu.py             # (not a plugin -- builds the menu from the registry)
 │   ├── username.py
 │   ├── email_lookup.py
 │   ├── phone.py
@@ -126,6 +127,45 @@ Geeps-OSINT/
 ├── requirements.txt
 └── logs/                  # created at runtime, gitignored
 ```
+
+## Plugin system
+
+Menu entries aren't hardcoded -- `osint.py` and `modules/menu.py` build
+the menu at startup by scanning `modules/` for any file that exposes a
+`MODULE_META` object and a `run()` function. Adding a new investigation
+module is a **one-file operation**:
+
+```python
+# modules/my_new_module.py
+from core.plugins import PluginMeta
+from core.ui import banner, clear, ok, pause
+
+MODULE_META = PluginMeta(
+    key="8",                 # menu key; "0" is reserved for Exit
+    name="My New Module",
+    description="One-line summary shown in the menu and --list-modules",
+    order=80,                # lower numbers appear higher in the menu
+)
+
+def run() -> None:
+    clear()
+    banner("MY NEW MODULE")
+    ok("Do your investigation here.")
+    pause()
+```
+
+Drop that file in `modules/` and it appears in the menu on the next
+run -- no edits to `menu.py` or `osint.py` needed.
+
+**One rule to keep discovery safe:** only do lightweight work (defining
+functions/constants) at module scope. Import third-party packages
+(`requests`, `dnspython`, `phonenumbers`, ...) *inside* `run()` or a
+helper function, not at the top of the file. That way, if your module's
+dependency isn't installed, it fails to load cleanly and shows up
+flagged in Health Check -- instead of crashing every other module too.
+
+Run `python3 osint.py --list-modules` any time to see every discovered
+module, including ones that failed to load and why.
 
 ## Ethical use
 
@@ -140,8 +180,12 @@ your jurisdiction.
 
 Run **Health Check** (menu option 6) first for any issue -- it checks
 Python version, every dependency, config validity, log directory
-writability, and basic network/DNS connectivity, and can auto-install
-missing packages.
+writability, basic network/DNS connectivity, and which plugins loaded
+successfully, and can auto-install missing packages.
+
+You can also run `python3 osint.py --list-modules` to see every
+discovered module without starting the interactive menu -- useful for
+confirming a new drop-in module registered correctly.
 
 Logs with full stack traces are always written to
 `logs/geeps-osint.log`, even when the on-screen message is short.

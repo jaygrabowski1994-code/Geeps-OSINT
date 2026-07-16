@@ -17,9 +17,17 @@ from typing import List
 
 from core.logger import get_logger
 from core.netutils import head, get
+from core.plugins import PluginMeta
 from core.ui import banner, clear, err, info, ok, pause, prompt, section, warn
 
 log = get_logger("username")
+
+MODULE_META = PluginMeta(
+    key="1",
+    name="Username Investigation",
+    description="Check a username's presence across major public platforms",
+    order=10,
+)
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.\-]{1,39}$")
 

@@ -2,9 +2,14 @@
 """
 Geeps OSINT Hub -- a modular, publicly-sourced OSINT investigation toolkit.
 
-Entry point: wires the interactive menu to each investigation module,
-performs a startup dependency check, and ensures unhandled errors in
-any module are logged and reported without crashing the whole app.
+Entry point: wires the interactive menu to whichever investigation
+plugins are found under modules/ (see core/plugins.py), performs a
+startup dependency check, and ensures unhandled errors in any single
+plugin are logged and reported without crashing the whole app.
+
+Adding a new investigation module is a one-file operation: drop a
+modules/<name>.py file exposing MODULE_META and run(), and it appears
+in the menu automatically -- no changes to this file or menu.py needed.
 """
 
 from __future__ import annotations
@@ -14,54 +19,58 @@ import sys
 from core.config import ensure_config_exists
 from core.dependencies import check_dependencies
 from core.logger import get_logger
+from core.plugins import get_broken_plugins, get_menu_plugins
 from core.ui import clear, err, pause
 
 log = get_logger("main")
 
 
 def _dispatch(choice: str) -> bool:
-    """Run the module for `choice`. Returns False if the app should exit."""
+    """Run the plugin matching `choice`. Returns False if the app should exit."""
     if choice == "0":
         print("\nThanks for using Geeps OSINT Hub.")
         return False
 
-    # Imported lazily so a broken/missing dependency in one module
-    # (e.g. phonenumbers not installed) can't prevent the whole app,
-    # including Health Check, from starting up.
+    plugin = next((p for p in get_menu_plugins() if p.meta.key == choice), None)
+    if plugin is None:
+        print("\nInvalid option.")
+        pause()
+        return True
+
     try:
-        if choice == "1":
-            from modules import username
-            username.run()
-        elif choice == "2":
-            from modules import email_lookup
-            email_lookup.run()
-        elif choice == "3":
-            from modules import phone
-            phone.run()
-        elif choice == "4":
-            from modules import domain
-            domain.run()
-        elif choice == "5":
-            from modules import employment
-            employment.run()
-        elif choice == "6":
-            from modules import health
-            health.run()
-        else:
-            print("\nInvalid option.")
-            pause()
+        plugin.run()
     except KeyboardInterrupt:
         print("\nInterrupted -- returning to menu.")
     except Exception:
-        log.exception("Unhandled error in module for menu choice '%s'", choice)
+        log.exception("Unhandled error in plugin '%s' (menu choice '%s')", plugin.module_name, choice)
         err("Something went wrong in that module. Details were written to logs/geeps-osint.log.")
         pause()
 
     return True
 
 
+def _list_modules() -> int:
+    """Print every discovered plugin (working and broken) and exit. Used by --list-modules."""
+    print("Installed modules:\n")
+    for plugin in get_menu_plugins():
+        print(f"  [{plugin.meta.key}] {plugin.meta.name} ({plugin.module_name}.py)")
+        if plugin.meta.description:
+            print(f"      {plugin.meta.description}")
+
+    broken = get_broken_plugins()
+    if broken:
+        print("\nFailed to load:\n")
+        for plugin in broken:
+            print(f"  {plugin.module_name}.py -- {plugin.load_error}")
+
+    return 0
+
+
 def main() -> int:
     ensure_config_exists()
+
+    if "--list-modules" in sys.argv:
+        return _list_modules()
 
     print("Starting Geeps OSINT Hub...")
     if not check_dependencies(auto_install=True):

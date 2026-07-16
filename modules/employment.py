@@ -22,10 +22,18 @@ from __future__ import annotations
 from urllib.parse import quote_plus
 
 from core.logger import get_logger
+from core.plugins import PluginMeta
 from core.ui import banner, clear, info, ok, pause, prompt, section, warn
 from modules import domain as domain_module
 
 log = get_logger("employment")
+
+MODULE_META = PluginMeta(
+    key="5",
+    name="Employment Investigation",
+    description="Public search links plus employer domain sanity check (public info only)",
+    order=50,
+)
 
 
 def _build_search_links(full_name: str, employer: str | None) -> list[tuple[str, str]]:

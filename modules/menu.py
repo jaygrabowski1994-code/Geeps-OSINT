@@ -1,29 +1,21 @@
-"""Main interactive menu for Geeps OSINT Hub."""
+"""Main interactive menu for Geeps OSINT Hub -- built dynamically from installed plugins."""
 
 from __future__ import annotations
 
-from core.ui import clear, banner, Fore, Style
-
-MENU_OPTIONS = {
-    "1": "Username Investigation",
-    "2": "Email Investigation",
-    "3": "Phone Investigation",
-    "4": "Domain Investigation",
-    "5": "Employment Investigation",
-    "6": "Health Check",
-    "0": "Exit",
-}
+from core.plugins import get_menu_plugins
+from core.ui import Fore, Style, banner, clear
 
 
 def main_menu() -> str:
-    """Render the main menu and return the user's raw choice string."""
+    """Render the main menu (auto-built from modules/ plugins) and return the user's choice."""
     clear()
     banner("GEEPS OSINT HUB")
     print(f"{Fore.CYAN}A modular, public-source OSINT toolkit{Style.RESET_ALL}\n")
 
-    for key in ("1", "2", "3", "4", "5", "6"):
-        print(f"  [{key}] {MENU_OPTIONS[key]}")
-    print(f"  [0] {MENU_OPTIONS['0']}")
+    plugins = get_menu_plugins()
+    for plugin in plugins:
+        print(f"  [{plugin.meta.key}] {plugin.meta.name}")
+    print("  [0] Exit")
 
     print()
     choice = input("Select an option: ").strip()

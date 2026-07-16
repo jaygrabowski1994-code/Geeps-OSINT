@@ -16,9 +16,17 @@ from __future__ import annotations
 from core.config import get as config_get
 from core.logger import get_logger
 from core.netutils import get
+from core.plugins import PluginMeta
 from core.ui import banner, clear, err, info, ok, pause, prompt, section, warn
 
 log = get_logger("phone")
+
+MODULE_META = PluginMeta(
+    key="3",
+    name="Phone Investigation",
+    description="Offline validation, region, timezone, and carrier metadata",
+    order=30,
+)
 
 
 def _offline_lookup(raw_number: str) -> None:

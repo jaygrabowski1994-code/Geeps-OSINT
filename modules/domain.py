@@ -15,9 +15,17 @@ from urllib.parse import urlparse
 
 from core.logger import get_logger
 from core.netutils import get
+from core.plugins import PluginMeta
 from core.ui import banner, clear, err, info, ok, pause, prompt, section, warn
 
 log = get_logger("domain")
+
+MODULE_META = PluginMeta(
+    key="4",
+    name="Domain Investigation",
+    description="DNS records, WHOIS, HTTP reachability, and TLS certificate details",
+    order=40,
+)
 
 DNS_RECORD_TYPES = ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA"]
 
