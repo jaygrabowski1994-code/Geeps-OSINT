@@ -17,7 +17,8 @@ from core.config import get as config_get
 from core.logger import get_logger
 from core.netutils import get
 from core.plugins import PluginMeta
-from core.ui import banner, clear, err, info, ok, pause, prompt, section, warn
+from core import phoneinfoga_runner
+from core.ui import banner, clear, confirm, err, info, ok, pause, prompt, section, warn
 
 log = get_logger("phone")
 
@@ -101,6 +102,18 @@ def _numverify_lookup(e164_number: str) -> None:
     info(f"  Location: {data.get('location', 'unknown')}, {data.get('country_name', '')}")
 
 
+def _run_phoneinfoga(e164_number: str) -> None:
+    section("PhoneInfoga")
+    info("Running PhoneInfoga...")
+    success, output = phoneinfoga_runner.run(e164_number)
+    if not success:
+        warn(output)
+        return
+    for line in output.splitlines():
+        if line.strip():
+            print(f"    {line}")
+
+
 def run() -> None:
     clear()
     banner("PHONE INVESTIGATION")
@@ -136,6 +149,17 @@ def run() -> None:
         except Exception:
             log.exception("Unexpected error during numverify lookup")
             err("Unexpected error during live verification -- skipping.")
+
+        if phoneinfoga_runner.available():
+            if confirm("PhoneInfoga is installed -- run it for additional scanners "
+                       "(VoIP detection, footprint search links)?", default=False):
+                try:
+                    _run_phoneinfoga(e164)
+                except Exception:
+                    log.exception("Unexpected error running PhoneInfoga")
+                    err("Unexpected error running PhoneInfoga -- see logs for details.")
+        else:
+            info(f"Tip: install PhoneInfoga for more scanners. {phoneinfoga_runner.INSTALL_HINT}")
 
     log.info("Phone investigation complete")
     pause()

@@ -20,9 +20,27 @@ from core.config import ensure_config_exists
 from core.dependencies import check_dependencies
 from core.logger import get_logger
 from core.plugins import get_broken_plugins, get_menu_plugins
-from core.ui import clear, err, pause
+from core import report
+from core.ui import clear, confirm, err, info, pause
 
 log = get_logger("main")
+
+
+def _offer_report_save(session) -> None:
+    """After a plugin finishes, offer to save its captured output as a report."""
+    if session is None or not session.has_content():
+        return
+    if not confirm("Save a report of this investigation?", default=False):
+        return
+    try:
+        paths = session.save()
+    except OSError as exc:
+        log.exception("Failed to save report")
+        err(f"Could not save report: {exc}")
+        return
+    for path in paths:
+        info(f"Saved: {path}")
+    pause()
 
 
 def _dispatch(choice: str) -> bool:
@@ -37,6 +55,7 @@ def _dispatch(choice: str) -> bool:
         pause()
         return True
 
+    session = report.start_session(plugin.meta.name)
     try:
         plugin.run()
     except KeyboardInterrupt:
@@ -45,6 +64,9 @@ def _dispatch(choice: str) -> bool:
         log.exception("Unhandled error in plugin '%s' (menu choice '%s')", plugin.module_name, choice)
         err("Something went wrong in that module. Details were written to logs/geeps-osint.log.")
         pause()
+    finally:
+        finished = report.end_session()
+        _offer_report_save(finished)
 
     return True
 

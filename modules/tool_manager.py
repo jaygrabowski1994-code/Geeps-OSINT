@@ -1,82 +1,63 @@
-
 """
 Tool Manager plugin for Geeps OSINT Hub.
+
+Detects which external OSINT tools are installed on this system (read
+only -- it never installs or launches anything itself). Two of the
+detected tools, Sherlock and PhoneInfoga, are also wired as optional
+add-on steps directly inside Username Investigation and Phone
+Investigation respectively, so you don't need to come back here to use
+them -- this page is just for an at-a-glance inventory.
 """
 
 from __future__ import annotations
 
 import platform
-import shutil
-import subprocess
 
+from core import tools
 from core.plugins import PluginMeta
-from core.ui import banner, clear, ok, warn, info, pause, section
+from core.ui import banner, clear, info, ok, pause, section, warn
 
 MODULE_META = PluginMeta(
     key="7",
     name="Tool Manager",
-    description="Detect installed external OSINT tools",
-    order=70,
+    description="Detect installed external OSINT tools (Sherlock, PhoneInfoga, etc.)",
+    order=80,
 )
 
-TOOLS = [
-    ("Python", "python"),
-    ("Python3", "python3"),
-    ("Git", "git"),
-    ("GitHub CLI", "gh"),
-    ("Sherlock", "sherlock"),
-    ("PhoneInfoga", "phoneinfoga"),
-    ("Holehe", "holehe"),
-    ("Maigret", "maigret"),
-    ("theHarvester", "theHarvester"),
-    ("Amass", "amass"),
-    ("Subfinder", "subfinder"),
-    ("Nmap", "nmap"),
-    ("ExifTool", "exiftool"),
-    ("Go", "go"),
-    ("Rust", "rustc"),
+# (display name, core.tools key, note)
+DISPLAY_TOOLS = [
+    ("Python 3", "python3", ""),
+    ("Git", "git", ""),
+    ("GitHub CLI", "gh", ""),
+    ("Sherlock", "sherlock", "used automatically by Username Investigation if installed"),
+    ("PhoneInfoga", "phoneinfoga", "used automatically by Phone Investigation if installed"),
+    ("Holehe", "holehe", "email-to-registered-accounts checker"),
+    ("Maigret", "maigret", "alternative username enumeration tool"),
+    ("theHarvester", "theHarvester", "email/subdomain/name harvesting"),
+    ("Amass", "amass", "subdomain enumeration"),
+    ("Subfinder", "subfinder", "subdomain enumeration"),
+    ("ExifTool", "exiftool", "media metadata extraction"),
 ]
 
-def get_version(command: str) -> str:
-    for arg in ("--version", "-V", "version"):
-        try:
-            result = subprocess.run(
-                [command, arg],
-                capture_output=True,
-                text=True,
-                timeout=3,
-            )
-            output = (result.stdout or result.stderr).splitlines()
-            if output:
-                return output[0].strip()
-        except Exception:
-            pass
-    return "Version unknown"
 
 def run() -> None:
     clear()
     banner("TOOL MANAGER")
+    info(f"Platform: {platform.system()} {platform.release()} ({platform.machine()})")
 
-    info(f"Platform : {platform.system()} {platform.release()}")
-    info(f"Machine  : {platform.machine()}")
-
-    section("Installed tools")
-
+    section("External tools")
     installed = 0
-    missing = 0
-
-    for name, exe in TOOLS:
-        path = shutil.which(exe)
-        if path:
+    for name, key, note in DISPLAY_TOOLS:
+        found = tools.path(key)
+        if found:
             installed += 1
-            ok(f"{name:<15} {path}")
-            print(f"      {get_version(exe)}")
+            ok(f"{name:<14} {tools.version(key)}")
+            print(f"      {found}")
         else:
-            missing += 1
-            warn(f"{name:<15} Not installed")
+            warn(f"{name:<14} not found on PATH")
+        if note:
+            print(f"      ({note})")
 
     section("Summary")
-    print(f"Installed : {installed}")
-    print(f"Missing   : {missing}")
-
+    info(f"{installed} of {len(DISPLAY_TOOLS)} tools detected.")
     pause()

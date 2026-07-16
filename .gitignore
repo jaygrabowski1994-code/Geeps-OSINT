@@ -10,6 +10,7 @@ env/
 # App-local state (never committed -- contains API keys / logs)
 config/config.json
 logs/
+reports/
 
 # OS/editor cruft
 .DS_Store

@@ -23,7 +23,7 @@ from core.config import get as config_get
 from core.logger import get_logger
 from core.netutils import get
 from core.plugins import PluginMeta
-from core.ui import banner, clear, err, info, ok, pause, prompt, section, warn
+from core.ui import banner, clear, err, info, ok, pause, prompt, run_parallel, section, warn
 
 log = get_logger("email")
 
@@ -48,11 +48,12 @@ DISPOSABLE_DOMAINS = {
 def _check_mx(domain: str) -> tuple[bool, str]:
     try:
         import dns.resolver
+        from core.dns_helper import get_resolver
     except ImportError:
         return False, "dnspython not installed"
 
     try:
-        answers = dns.resolver.resolve(domain, "MX", lifetime=6)
+        answers = get_resolver().resolve(domain, "MX", lifetime=6)
         records = sorted((r.preference, str(r.exchange).rstrip(".")) for r in answers)
         return True, ", ".join(f"{host} (priority {pref})" for pref, host in records[:5])
     except dns.resolver.NXDOMAIN:
@@ -115,40 +116,46 @@ def run() -> None:
 
     domain = email.rsplit("@", 1)[-1].lower()
 
-    section("MX record lookup")
-    try:
-        has_mx, detail = _check_mx(domain)
-        if has_mx:
-            ok(f"Domain accepts mail: {detail}")
-        else:
-            warn(f"No usable MX records ({detail}).")
-    except Exception:
-        log.exception("Unexpected error during MX lookup")
-        err("Unexpected error during MX lookup -- continuing.")
-
     section("Disposable email check")
     if domain in DISPOSABLE_DOMAINS:
         warn("This domain is a known disposable/temporary email provider.")
     else:
         ok("Domain not found in local disposable-email list.")
 
-    section("Gravatar public profile")
-    try:
-        has_gravatar, detail = _check_gravatar(email)
-        if has_gravatar:
-            ok(f"Public Gravatar profile found: {detail}")
-        else:
-            info(f"No public Gravatar profile ({detail}).")
-    except Exception:
-        log.exception("Unexpected error during Gravatar check")
-        err("Unexpected error during Gravatar check -- continuing.")
+    def _safe_mx():
+        try:
+            has_mx, detail = _check_mx(domain)
+            if has_mx:
+                ok(f"Domain accepts mail: {detail}")
+            else:
+                warn(f"No usable MX records ({detail}).")
+        except Exception:
+            log.exception("Unexpected error during MX lookup")
+            err("Unexpected error during MX lookup.")
 
-    section("Breach exposure (Have I Been Pwned)")
-    try:
-        info(_check_hibp(email))
-    except Exception:
-        log.exception("Unexpected error during HIBP check")
-        err("Unexpected error during breach check -- continuing.")
+    def _safe_gravatar():
+        try:
+            has_gravatar, detail = _check_gravatar(email)
+            if has_gravatar:
+                ok(f"Public Gravatar profile found: {detail}")
+            else:
+                info(f"No public Gravatar profile ({detail}).")
+        except Exception:
+            log.exception("Unexpected error during Gravatar check")
+            err("Unexpected error during Gravatar check.")
+
+    def _safe_hibp():
+        try:
+            info(_check_hibp(email))
+        except Exception:
+            log.exception("Unexpected error during HIBP check")
+            err("Unexpected error during breach check.")
+
+    run_parallel({
+        "MX record lookup": _safe_mx,
+        "Gravatar public profile": _safe_gravatar,
+        "Breach exposure (Have I Been Pwned)": _safe_hibp,
+    })
 
     log.info("Email investigation complete for domain %s", domain)
     pause()

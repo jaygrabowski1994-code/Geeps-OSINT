@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 from core.logger import get_logger
 from core.netutils import get
 from core.plugins import PluginMeta
-from core.ui import banner, clear, err, info, ok, pause, prompt, section, warn
+from core.ui import banner, clear, err, info, ok, pause, prompt, run_parallel, section, warn
 
 log = get_logger("domain")
 
@@ -40,13 +40,15 @@ def _normalize_domain(raw: str) -> str:
 def _dns_lookup(domain: str) -> None:
     try:
         import dns.resolver
+        from core.dns_helper import get_resolver
     except ImportError:
         err("The 'dnspython' package is not installed. Run Health Check to install dependencies.")
         return
 
+    resolver = get_resolver()
     for record_type in DNS_RECORD_TYPES:
         try:
-            answers = dns.resolver.resolve(domain, record_type, lifetime=6)
+            answers = resolver.resolve(domain, record_type, lifetime=6)
             values = [str(r).strip() for r in answers]
             ok(f"{record_type:6} {'; '.join(values)}")
         except dns.resolver.NoAnswer:
@@ -173,33 +175,40 @@ def run() -> None:
 
     log.info("Domain investigation started for %s", domain)
 
-    section("DNS records")
-    try:
-        _dns_lookup(domain)
-    except Exception:
-        log.exception("Unexpected error during DNS lookup")
-        err("Unexpected error during DNS lookup -- continuing.")
+    def _safe_dns():
+        try:
+            _dns_lookup(domain)
+        except Exception:
+            log.exception("Unexpected error during DNS lookup")
+            err("Unexpected error during DNS lookup.")
 
-    section("WHOIS")
-    try:
-        _whois_lookup(domain)
-    except Exception:
-        log.exception("Unexpected error during WHOIS lookup")
-        err("Unexpected error during WHOIS lookup -- continuing.")
+    def _safe_whois():
+        try:
+            _whois_lookup(domain)
+        except Exception:
+            log.exception("Unexpected error during WHOIS lookup")
+            err("Unexpected error during WHOIS lookup.")
 
-    section("HTTP reachability")
-    try:
-        _http_headers(domain)
-    except Exception:
-        log.exception("Unexpected error during HTTP check")
-        err("Unexpected error during HTTP check -- continuing.")
+    def _safe_http():
+        try:
+            _http_headers(domain)
+        except Exception:
+            log.exception("Unexpected error during HTTP check")
+            err("Unexpected error during HTTP check.")
 
-    section("TLS certificate")
-    try:
-        _tls_cert_info(domain)
-    except Exception:
-        log.exception("Unexpected error during TLS check")
-        err("Unexpected error during TLS check -- continuing.")
+    def _safe_tls():
+        try:
+            _tls_cert_info(domain)
+        except Exception:
+            log.exception("Unexpected error during TLS check")
+            err("Unexpected error during TLS check.")
+
+    run_parallel({
+        "DNS records": _safe_dns,
+        "WHOIS": _safe_whois,
+        "HTTP reachability": _safe_http,
+        "TLS certificate": _safe_tls,
+    })
 
     log.info("Domain investigation complete for %s", domain)
     pause()

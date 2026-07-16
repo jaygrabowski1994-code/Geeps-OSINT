@@ -8,22 +8,58 @@ self-audits, and public-record verification.
 
 ## Features
 
-| Menu option | Module | What it does |
+| Menu | Module | What it does |
 |---|---|---|
-| 1 | Username Investigation | Checks a username's presence across major public platforms (GitHub, Reddit, Steam, etc.) via unauthenticated profile URLs |
-| 2 | Email Investigation | Syntax validation, MX record lookup, disposable-domain check, public Gravatar lookup, optional HIBP breach check |
-| 3 | Phone Investigation | Offline validation, region, timezone, and carrier metadata via libphonenumber; optional live verification |
-| 4 | Domain Investigation | DNS records, WHOIS, HTTP reachability, TLS certificate details |
+| 1 | Username Investigation | Checks a username across 55 major public platforms in parallel, with an optional handoff to [Sherlock](https://github.com/sherlock-project/sherlock) (400+ sites) if it's installed |
+| 2 | Email Investigation | Syntax validation, MX record lookup, disposable-domain check, public Gravatar lookup, optional HIBP breach check -- network checks run in parallel |
+| 3 | Phone Investigation | Offline validation, region, timezone, and carrier metadata via libphonenumber; optional numverify live verification; optional [PhoneInfoga](https://github.com/sundowndev/phoneinfoga) handoff if installed |
+| 4 | Domain Investigation | DNS records, WHOIS, HTTP reachability, and TLS certificate details -- all four run in parallel |
+| 8 | Subdomain Enumeration | Passive discovery via certificate transparency logs (crt.sh) plus a parallel DNS brute force against common subdomain names |
 | 5 | Employment Investigation | Generates public search links (name/employer) and verifies a claimed employer's public web presence -- never scrapes LinkedIn or any authenticated platform |
-| 6 | Health Check | Verifies Python version, dependencies, config, logging, and network connectivity; can auto-install missing packages |
+| 7 | Tool Manager | Read-only inventory of which external OSINT tools (Sherlock, PhoneInfoga, Amass, etc.) are installed on this system |
+| 6 | Health Check | Verifies Python version, dependencies, config, logging, network connectivity, and which plugins loaded; can auto-install missing packages |
 
 Every module:
 - Has isolated error handling -- one failed lookup never crashes the app
 - Logs to `logs/geeps-osint.log` (rotating, gitignored)
 - Reads settings/API keys from `config/config.json` (gitignored; created
   automatically from `config/config.example.json` on first run)
-- Works with **zero API keys configured** -- optional keys only unlock
-  extra enrichment (HIBP breach data, numverify live carrier lookup)
+- Works with **zero API keys and zero external tools installed** --
+  optional keys/tools only unlock extra enrichment
+- Can save its output as a report (see below) -- no per-module code
+  needed for this, it's automatic
+
+## Report generation
+
+After any module finishes, you'll be asked whether to save a report.
+Say yes and you get two files in `reports/` (gitignored -- reports can
+contain the person/domain/number you investigated):
+
+- **`.html`** -- a styled, self-contained report you can open in any
+  browser. Use the browser's own **Print → Save as PDF** to get a PDF
+  copy; this avoids pulling in a native PDF-rendering dependency (e.g.
+  WeasyPrint needs system Cairo/Pango libraries that are painful to
+  install on Termux) just to reproduce what a browser already does.
+- **`.json`** -- the same data, structured, for scripting or archival.
+
+## Optional external tools
+
+Two menus offer to hand off to a well-known external tool if it's
+installed, instead of reimplementing it:
+
+- **Sherlock** (Username Investigation) -- checks 400+ sites, versus
+  this toolkit's own 55-site built-in list.
+  Install: `pipx install sherlock-project` (or `pip install sherlock-project`)
+- **PhoneInfoga** (Phone Investigation) -- runs additional scanners
+  (VoIP/OVH detection, footprint search-link generation). Note: this
+  upstream project describes itself as stable but unmaintained.
+  Install: see [releases](https://github.com/sundowndev/phoneinfoga) for
+  prebuilt binaries, or use their Docker image.
+
+Both are entirely optional -- every module works fully without them,
+and the app only ever offers to run them, never auto-runs them.
+**Tool Manager** (menu 7) shows which external tools it can currently
+see on your `PATH`.
 
 ## Requirements
 
@@ -56,6 +92,16 @@ missing packages for you (falling back to `--break-system-packages` on
 newer Debian/Ubuntu releases that block system-wide pip installs by
 default).
 
+Optional external tools:
+
+```bash
+# Sherlock (username enumeration across 400+ sites)
+python3 -m pip install --user pipx && pipx install sherlock-project
+
+# PhoneInfoga (additional phone number scanners)
+# Prebuilt binaries / Docker image: https://github.com/sundowndev/phoneinfoga
+```
+
 ### Termux (Android)
 
 ```bash
@@ -78,6 +124,19 @@ python osint.py
 If any package fails to build on Termux, run the app anyway (`python
 osint.py`) and use menu option **6 (Health Check)** -- it will detect
 what's missing and attempt to install it automatically.
+
+Optional external tools on Termux:
+
+```bash
+# Sherlock
+pip install pipx && pipx install sherlock-project
+
+# PhoneInfoga: no official Termux/Android build; the Go binary can
+# sometimes be built from source with `pkg install golang`, but this
+# is unsupported by the upstream project. Skip it on Termux if this
+# doesn't work cleanly -- Phone Investigation's other checks all work
+# fine without it.
+```
 
 ## Configuration
 
@@ -106,26 +165,33 @@ On first run, `config/config.json` is created automatically from
 
 ```
 Geeps-OSINT/
-├── osint.py              # Entry point
+├── osint.py                    # Entry point
 ├── core/
-│   ├── config.py          # Config loading (config/config.json)
-│   ├── logger.py          # Rotating file + console logging
-│   ├── dependencies.py    # Startup dependency check / auto-install
-│   ├── netutils.py        # Shared HTTP helper (timeouts, retries)
-│   ├── plugins.py         # Plugin discovery/registry -- see "Plugin system" below
-│   └── ui.py               # Shared terminal UI helpers
-├── modules/                # Each file here = one auto-discovered menu entry
-│   ├── menu.py             # (not a plugin -- builds the menu from the registry)
+│   ├── config.py                # Config loading (config/config.json)
+│   ├── logger.py                # Rotating file + console logging
+│   ├── dependencies.py          # Startup dependency check / auto-install
+│   ├── netutils.py              # Shared HTTP helper (timeouts, retries)
+│   ├── plugins.py               # Plugin discovery/registry -- see "Plugin system" below
+│   ├── report.py                # Report engine (HTML/JSON) -- see "Report generation" above
+│   ├── tools.py                 # External-tool detection (used by Tool Manager)
+│   ├── sherlock_runner.py       # Optional Sherlock subprocess launcher
+│   ├── phoneinfoga_runner.py    # Optional PhoneInfoga subprocess launcher
+│   └── ui.py                    # Shared terminal UI, parallel-run helper, report hooks
+├── modules/                     # Each file here = one auto-discovered menu entry
+│   ├── menu.py                  # (not a plugin -- builds the menu from the registry)
 │   ├── username.py
 │   ├── email_lookup.py
 │   ├── phone.py
 │   ├── domain.py
+│   ├── subdomain.py
 │   ├── employment.py
+│   ├── tool_manager.py
 │   └── health.py
 ├── config/
 │   └── config.example.json
 ├── requirements.txt
-└── logs/                  # created at runtime, gitignored
+├── logs/                        # created at runtime, gitignored
+└── reports/                     # created on demand, gitignored
 ```
 
 ## Plugin system
@@ -141,10 +207,10 @@ from core.plugins import PluginMeta
 from core.ui import banner, clear, ok, pause
 
 MODULE_META = PluginMeta(
-    key="8",                 # menu key; "0" is reserved for Exit
+    key="9",                 # menu key; "0" is reserved for Exit
     name="My New Module",
     description="One-line summary shown in the menu and --list-modules",
-    order=80,                # lower numbers appear higher in the menu
+    order=100,                # lower numbers appear higher in the menu
 )
 
 def run() -> None:
@@ -155,14 +221,27 @@ def run() -> None:
 ```
 
 Drop that file in `modules/` and it appears in the menu on the next
-run -- no edits to `menu.py` or `osint.py` needed.
+run -- no edits to `menu.py` or `osint.py` needed. Its output is
+automatically eligible for report saving too, for free.
 
-**One rule to keep discovery safe:** only do lightweight work (defining
-functions/constants) at module scope. Import third-party packages
-(`requests`, `dnspython`, `phonenumbers`, ...) *inside* `run()` or a
-helper function, not at the top of the file. That way, if your module's
-dependency isn't installed, it fails to load cleanly and shows up
-flagged in Health Check -- instead of crashing every other module too.
+**Two rules that keep discovery and reports safe:**
+
+1. Only do lightweight work (defining functions/constants) at module
+   scope. Import third-party packages (`requests`, `dnspython`,
+   `phonenumbers`, ...) *inside* `run()` or a helper function, not at
+   the top of the file. That way, if your module's dependency isn't
+   installed, it fails to load cleanly and shows up flagged in Health
+   Check -- instead of crashing every other module too.
+2. Use `core.ui`'s `ok()`/`warn()`/`err()`/`info()`/`section()`/
+   `prompt()` for all output instead of raw `print()` where you want
+   it to show up in a saved report. Plain `print()` still works, it
+   just won't appear in the HTML/JSON report.
+
+If your module runs several independent network checks, use
+`core.ui.run_parallel()` to run them concurrently with clean, ordered
+output (see `modules/domain.py` for an example) instead of a raw
+`ThreadPoolExecutor`, which would interleave output from different
+checks into a mess.
 
 Run `python3 osint.py --list-modules` any time to see every discovered
 module, including ones that failed to load and why.

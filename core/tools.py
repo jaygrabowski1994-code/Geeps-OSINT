@@ -26,6 +26,14 @@ TOOLS = {
     "rustc": "rustc",
 }
 
+# Tools whose version flag doesn't match the common --version/-V/version
+# convention tried below. exiftool in particular doesn't recognize
+# --version at all and instead prints its own manual page (starting
+# with "NAME"), which would otherwise get mistaken for real output.
+_VERSION_ARG_OVERRIDES = {
+    "exiftool": ["-ver"],
+}
+
 def is_installed(name: str) -> bool:
     exe = TOOLS.get(name, name)
     return shutil.which(exe) is not None
@@ -39,7 +47,9 @@ def version(name: str) -> str:
     if shutil.which(exe) is None:
         return "Not installed"
 
-    for arg in ("--version", "-V", "version"):
+    args_to_try = _VERSION_ARG_OVERRIDES.get(name, ["--version", "-V", "version"])
+    fallback = ""
+    for arg in args_to_try:
         try:
             r = subprocess.run(
                 [exe, arg],
@@ -47,10 +57,18 @@ def version(name: str) -> str:
                 text=True,
                 timeout=3,
             )
-            out = (r.stdout or r.stderr).splitlines()
-            if out:
-                return out[0].strip()
+            lines = (r.stdout or r.stderr).splitlines()
+            if not lines:
+                continue
+            first_line = lines[0].strip()
+            # Only trust output from an attempt that actually succeeded --
+            # a nonzero exit (e.g. an unrecognized flag) often still
+            # prints *something* to stderr, which isn't the version.
+            if r.returncode == 0 and first_line:
+                return first_line
+            if first_line and not fallback:
+                fallback = first_line
         except Exception:
             pass
 
-    return "Unknown version"
+    return fallback or "Unknown version"
